@@ -1,8 +1,11 @@
 import express from "express";
 import { engine } from "express-handlebars";
+import bcrypt from "bcrypt";
 
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
+
+const SALT_ROUNDS = 10;
 
 const dbPromise = open({
   filename: "data.db",
@@ -23,20 +26,36 @@ app.get("/", async (req, res) => {
   res.render("home", { messages });
 });
 
+app.get("/register", async (req, res) => {
+  res.render("register");
+});
+
+app.post("/register", async (req, res) => {
+  const db = await dbPromise;
+  const { username, password, passwordRepeat } = req.body;
+  if (password !== passwordRepeat) {
+    res.render("register", { error: "Passwords must match" });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+  await db.run(
+    "INSERT INTO User (username, password) VALUES (?, ?)",
+    username,
+    passwordHash
+  );
+  res.redirect("/");
+});
+
 app.post("/message", async (req, res) => {
-    const db = await dbPromise
+  const db = await dbPromise;
   const messageText = req.body.messageText;
-await db.run('INSERT INTO Message (text) VALUES (?);', messageText)
+  await db.run("INSERT INTO Message (text) VALUES (?);", messageText);
   res.redirect("/");
   // res.send('message received ' + messageText )
 });
 
 app.get("/", (req, res) => {
   res.render("home");
-});
-
-app.get("/time", (req, res) => {
-  res.render("the current time is " + new Date().toLocaleTimeString());
 });
 
 const setup = async () => {
